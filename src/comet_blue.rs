@@ -312,6 +312,7 @@ pub struct Schedule {
 pub struct CommetBlue {
     pub address: [u8; 6], // 6 byte address used to identify Bluetooth devices
     pub pin: Pin,
+    #[serde(default = "default_commet_blue_field_clock")]
     pub clock: Datetime,
     pub identifier: String,
     pub version: String,
@@ -319,4 +320,19 @@ pub struct CommetBlue {
     pub temperatures: Temperatures,
     pub schedule: Schedule,
     pub battery: Battery,
+}
+
+fn default_commet_blue_field_clock() -> Datetime {
+    let now: chrono::DateTime<chrono::Local> = chrono::Local::now();
+    let bing = Datetime::try_from(now).unwrap();
+    match bing.try_into() {
+        Ok(p) => p,
+        Err(_) => Datetime {
+            minute: 0,
+            hour: 0,
+            day: 1,
+            month: 1,
+            year: 10,
+        },
+    }
 }
