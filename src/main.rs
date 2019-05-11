@@ -149,6 +149,10 @@ impl PeripheralHolder {
         let clock: comet_blue::Datetime = self.read(characteristics::DATETIME)?;
         let battery: comet_blue::Battery = self.read(characteristics::BATTERY)?;
         let temperatures: comet_blue::Temperatures = self.read(characteristics::TEMPERATURES)?;
+        let identifier: comet_blue::Text = self.read(characteristics::IDENTIFIER)?;
+        let version: comet_blue::Text = self.read(characteristics::VERSION)?;
+        let firmware_revison: comet_blue::Text = self.read(characteristics::FIRMWARE_VERSION)?;
+        let manufacturer: comet_blue::Text = self.read(characteristics::MANUFACTURER)?;
         let week = comet_blue::Week {
             monday: self.read(characteristics::MONDAY)?,
             tuesday: self.read(characteristics::TUESDAY)?,
@@ -186,9 +190,10 @@ impl PeripheralHolder {
             address: self.peripheral.address().address,
             pin: pin,
             clock: clock,
-            identifier: "asdasd".to_string(),
-            version: "asdasd".to_string(),
-            firmware_revison: "asdasd".to_string(),
+            identifier: identifier,
+            version: version,
+            firmware_revison: firmware_revison,
+            manufacturer: manufacturer,
             temperatures: temperatures,
             schedule: schedule,
             battery: battery,
@@ -353,7 +358,6 @@ fn save(save_path: &str) {
         }
         // discover characteristics
         item.discover_characteristics().unwrap();
-
         // find the characteristic we want
         let chars = item.characteristics();
 
