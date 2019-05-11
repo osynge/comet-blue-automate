@@ -250,6 +250,19 @@ impl TryFrom<Vec<u8>> for Holiday {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Text(String);
+
+impl TryFrom<Vec<u8>> for Text {
+    type Error = &'static str;
+    fn try_from(input: Vec<u8>) -> Result<Self, Self::Error> {
+        match String::from_utf8(input) {
+            Ok(p) => Ok(Text(p)),
+            Err(_) => Err("Not valid utf8"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Battery {
     #[serde(default = "default_battery_field")]
     charge: u8,
@@ -314,9 +327,10 @@ pub struct CommetBlue {
     pub pin: Pin,
     #[serde(default = "default_commet_blue_field_clock")]
     pub clock: Datetime,
-    pub identifier: String,
-    pub version: String,
-    pub firmware_revison: String,
+    pub identifier: Text,
+    pub version: Text,
+    pub firmware_revison: Text,
+    pub manufacturer: Text,
     pub temperatures: Temperatures,
     pub schedule: Schedule,
     pub battery: Battery,
