@@ -25,20 +25,20 @@ use std::convert::TryInto;
 
 pub fn on_event(foo: rumble::api::CentralEvent) {
     match foo {
-        rumble::api::CentralEvent::DeviceDiscovered(BDAddr) => {
-            println!("DeviceDiscovered:{}", BDAddr);
+        rumble::api::CentralEvent::DeviceDiscovered(bd_addr) => {
+            println!("DeviceDiscovered:{}", bd_addr);
         }
-        rumble::api::CentralEvent::DeviceLost(BDAddr) => {
-            println!("DeviceLost:{}", BDAddr);
+        rumble::api::CentralEvent::DeviceLost(bd_addr) => {
+            println!("DeviceLost:{}", bd_addr);
         }
-        rumble::api::CentralEvent::DeviceUpdated(BDAddr) => {
-            println!("DeviceUpdated:{}", BDAddr);
+        rumble::api::CentralEvent::DeviceUpdated(bd_addr) => {
+            println!("DeviceUpdated:{}", bd_addr);
         }
-        rumble::api::CentralEvent::DeviceConnected(BDAddr) => {
-            println!("DeviceConnected:{}", BDAddr);
+        rumble::api::CentralEvent::DeviceConnected(bd_addr) => {
+            println!("DeviceConnected:{}", bd_addr);
         }
-        rumble::api::CentralEvent::DeviceDisconnected(BDAddr) => {
-            println!("DeviceDisconnected:{}", BDAddr);
+        rumble::api::CentralEvent::DeviceDisconnected(bd_addr) => {
+            println!("DeviceDisconnected:{}", bd_addr);
         }
     }
 }
