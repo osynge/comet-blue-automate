@@ -1,7 +1,7 @@
+extern crate chrono;
+extern crate clap;
 extern crate rand;
 extern crate rumble;
-
-extern crate chrono;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
@@ -16,7 +16,9 @@ use std::collections::BTreeSet;
 use std::convert::TryFrom;
 use std::thread;
 use std::time::Duration;
+mod app_const;
 mod characteristics;
+mod cli_clap;
 mod comet_blue;
 
 use comet_blue::{Datetime, Temperatures};
@@ -298,5 +300,6 @@ fn discover() {
 }
 
 pub fn main() {
+    let clap_matches = cli_clap::cli_clap();
     discover();
 }
