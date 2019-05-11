@@ -47,7 +47,7 @@ fn getcommetdate() -> Result<Vec<u8>, ()> {
     //let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
     let now: chrono::DateTime<chrono::Local> = chrono::Local::now();
     let bing = comet_blue::Datetime::try_from(now).unwrap();
-    let foo = match bing.try_into() {
+    let _foo = match bing.try_into() {
         Ok(p) => return Ok(p),
         Err(_) => return Err(()),
     };
@@ -206,7 +206,7 @@ impl Peripheral_holder {
         };
         match self.peripheral.request(&datetimechar, &writevec) {
             Ok(_) => Ok(()),
-            Err(p) => Err("failed"),
+            Err(_p) => Err("failed"),
         }
     }
 
@@ -268,7 +268,7 @@ fn discover() {
     }
     for item in central.peripherals().into_iter() {
         match item.connect() {
-            Ok(p) => {}
+            Ok(_p) => {}
             Err(p) => {
                 println!("Failed to connect:{}", p);
                 continue;
