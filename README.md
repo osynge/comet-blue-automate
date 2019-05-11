@@ -38,11 +38,19 @@ This will save a file which looks like:
           "pin_5": 0,
           "pin_6": 0
         },
-        "identifier": "asdasd",
-        "version": "asdasd",
-        "firmware_revison": "asdasd",
+        "clock": {
+          "minute": 54,
+          "hour": 20,
+          "day": 11,
+          "month": 5,
+          "year": 19
+        },
+        "identifier": "Comet Blue",
+        "version": "COBL0124",
+        "firmware_revison": "0.0.5-beta1",
+        "manufacturer": "EUROtronic GmbH",
         "temperatures": {
-          "current": 46,
+          "current": 40,
           "manual": 21,
           "target_low": 28,
           "target_high": 15,
