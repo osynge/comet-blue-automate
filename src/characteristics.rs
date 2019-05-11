@@ -1,5 +1,13 @@
 use rumble::api::UUID;
 
+pub static IDENTIFIER: UUID = UUID::B16(0x2A00);
+
+pub static VERSION: UUID = UUID::B16(0x2A26);
+
+pub static FIRMWARE_VERSION: UUID = UUID::B16(0x2A28);
+
+pub static MANUFACTURER: UUID = UUID::B16(0x2A29);
+
 pub static DATETIME: UUID = UUID::B128([
     0x67, 0xDF, 0xD1, 0x30, 0x42, 0x16, 0x39, 0x89, 0xE4, 0x11, 0xE9, 0x47, 0x01, 0xEE, 0xE9, 0x47,
 ]);
