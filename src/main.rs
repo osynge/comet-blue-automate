@@ -274,7 +274,7 @@ fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
         //connect(&num);
         //get_temps(&num);
     }
-    let mut all_peripherals = Vec::new();
+
     for item in central.peripherals().into_iter() {
         match item.connect() {
             Ok(_p) => {}
@@ -289,7 +289,7 @@ fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
         // find the characteristic we want
         let chars = item.characteristics();
 
-        let jil = PeripheralHolder {
+        let mut jil = PeripheralHolder {
             peripheral: item,
             characteristics: chars,
         };
@@ -299,13 +299,14 @@ fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
         jil.enter_pin();
         let boo = jil.commet_blue_read().unwrap();
 
-        let _foo = boo.clone();
-        all_peripherals.push(boo.clone());
+        for load_perf in cb_list {
+            if load_perf.address == boo.address {
+                jil.commet_blue_write(load_perf.clone());
+            }
+        }
+
         //jil.commet_blue_write(foo);
     }
-    let serialized = serde_json::to_string_pretty(&all_peripherals).unwrap();
-
-    println!("{}", serialized);
 }
 
 fn save(save_path: &str) {
@@ -371,13 +372,11 @@ fn save(save_path: &str) {
         //jil.commet_blue_write(foo);
     }
     let serialized = serde_json::to_string_pretty(&all_peripherals).unwrap();
-
-    println!("{}", serialized);
     let path = Path::new(save_path);
-    let mut rsult_file = File::create(path);
+    let rsult_file = File::create(path);
     let mut file = match rsult_file {
         Ok(p) => p,
-        Err(p) => return,
+        Err(_) => return,
     };
 
     file.write_all(serialized.as_bytes());
