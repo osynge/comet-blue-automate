@@ -6,6 +6,8 @@ edition = "2018"
 
 [dependencies]
 clap = "2"
+log = "0.4"
+fern = "0.5"
 # Using fork of rumble to work around https://github.com/mwylde/rumble/issues/34
 rumble = { git = "https://github.com/osynge/rumble.git", branch = "issues_34" }
 rand = "*"

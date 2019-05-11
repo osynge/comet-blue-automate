@@ -1,5 +1,8 @@
 extern crate chrono;
 extern crate clap;
+#[macro_use]
+extern crate log;
+extern crate fern;
 extern crate rand;
 extern crate rumble;
 #[macro_use]
@@ -20,6 +23,7 @@ mod app_const;
 mod characteristics;
 mod cli_clap;
 mod comet_blue;
+mod fern_setup;
 
 use comet_blue::{Datetime, Temperatures};
 use rumble::bluez::adapter::ConnectedAdapter;
@@ -28,19 +32,19 @@ use std::convert::TryInto;
 pub fn on_event(foo: rumble::api::CentralEvent) {
     match foo {
         rumble::api::CentralEvent::DeviceDiscovered(bd_addr) => {
-            println!("DeviceDiscovered:{}", bd_addr);
+            debug!("DeviceDiscovered:{}", bd_addr);
         }
         rumble::api::CentralEvent::DeviceLost(bd_addr) => {
-            println!("DeviceLost:{}", bd_addr);
+            debug!("DeviceLost:{}", bd_addr);
         }
         rumble::api::CentralEvent::DeviceUpdated(bd_addr) => {
-            println!("DeviceUpdated:{}", bd_addr);
+            debug!("DeviceUpdated:{}", bd_addr);
         }
         rumble::api::CentralEvent::DeviceConnected(bd_addr) => {
-            println!("DeviceConnected:{}", bd_addr);
+            debug!("DeviceConnected:{}", bd_addr);
         }
         rumble::api::CentralEvent::DeviceDisconnected(bd_addr) => {
-            println!("DeviceDisconnected:{}", bd_addr);
+            debug!("DeviceDisconnected:{}", bd_addr);
         }
     }
 }
@@ -83,11 +87,11 @@ impl PeripheralHolder {
             .find(|c| c.uuid == characteristics::PASSWORD);
         let authchar = match cmd_char {
             Some(p) => {
-                println!("UUID:{}", characteristics::PASSWORD);
+                debug!("UUID:{}", characteristics::PASSWORD);
                 p
             }
             None => {
-                println!("Not found");
+                error!("Not found");
                 return;
             }
         };
@@ -95,18 +99,17 @@ impl PeripheralHolder {
         self.peripheral.request(&authchar, &pwd).unwrap();
     }
     fn datetime(&self) {
-        println!("UUID:{}", characteristics::DATETIME);
         let cmd_char = self
             .characteristics
             .iter()
             .find(|c| c.uuid == characteristics::DATETIME);
         let datetimechar = match cmd_char {
             Some(p) => {
-                println!("UUID:{}", characteristics::DATETIME);
+                debug!("UUID:{}", characteristics::DATETIME);
                 p
             }
             None => {
-                println!("Not found");
+                error!("characteristics not found");
                 return;
             }
         };
@@ -242,10 +245,9 @@ fn discover() {
     let mut adapter = adapters.into_iter().nth(0).unwrap();
 
     // reset the adapter -- clears out any errant state
-    println!("Hello, world!");
+
     adapter = manager.down(&adapter).unwrap();
     adapter = manager.up(&adapter).unwrap();
-    println!("Hello, world!");
 
     // connect to the adapter
     let central = adapter.connect().unwrap();
@@ -260,9 +262,9 @@ fn discover() {
     let foo = central.peripherals().into_iter();
     //asdfg(&central);
     for num in foo {
-        println!("address:{}", num.properties().address);
+        debug!("address:{}", num.properties().address);
         match num.properties().local_name {
-            Some(name) => println!("name:{}", name),
+            Some(name) => info!("name:{}", name),
             None => {}
         }
         //connect(&num);
@@ -272,7 +274,7 @@ fn discover() {
         match item.connect() {
             Ok(_p) => {}
             Err(p) => {
-                println!("Failed to connect:{}", p);
+                error!("Failed to connect:{}", p);
                 continue;
             }
         }
@@ -301,5 +303,6 @@ fn discover() {
 
 pub fn main() {
     let clap_matches = cli_clap::cli_clap();
+    fern_setup::log_setup(&clap_matches);
     discover();
 }
