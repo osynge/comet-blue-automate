@@ -12,10 +12,16 @@ use chrono::{Local, NaiveDate, NaiveDateTime, Timelike, Utc};
 use rand::{thread_rng, Rng};
 use rumble::api::{Central, Peripheral, UUID};
 use rumble::bluez::manager::Manager;
+use std::collections::BTreeSet;
 use std::convert::TryFrom;
 use std::thread;
 use std::time::Duration;
+mod characteristics;
 mod comet_blue;
+use characteristics::PASSWORD;
+use comet_blue::{Datetime, Temperatures};
+use rumble::bluez::adapter::ConnectedAdapter;
+use std::convert::TryInto;
 
 pub fn on_event(foo: rumble::api::CentralEvent) {
     match foo {
@@ -40,29 +46,193 @@ pub fn on_event(foo: rumble::api::CentralEvent) {
 fn getcommetdate() -> Result<Vec<u8>, ()> {
     //let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
     let now: chrono::DateTime<chrono::Local> = chrono::Local::now();
-
-    let try_smaller_year = u8::try_from(now.year() - 2000);
-    let try_smaller_month = u8::try_from(now.month());
-    let try_smaller_day = u8::try_from(now.day());
-    let try_smaller_hour = u8::try_from(now.hour());
-    let try_smaller_minute = u8::try_from(now.minute());
-    let setdateyear = try_smaller_year.unwrap();
-    let setdatemonth = try_smaller_month.unwrap();
-    let setdateday = try_smaller_day.unwrap();
-    let setdatehour = try_smaller_hour.unwrap();
-    let setdateminute = try_smaller_minute.unwrap();
-    println!("setdateyear:{}:{}", setdateyear, setdatemonth);
-    let setdate = vec![
-        setdateminute,
-        setdatehour,
-        setdateday,
-        setdatemonth,
-        setdateyear,
-    ];
-    Ok(setdate)
+    let bing = comet_blue::Datetime::try_from(now).unwrap();
+    let foo = match bing.try_into() {
+        Ok(p) => return Ok(p),
+        Err(_) => return Err(()),
+    };
 }
 
-pub fn main() {
+pub struct Peripheral_holder {
+    peripheral: rumble::bluez::adapter::peripheral::Peripheral,
+    characteristics: BTreeSet<rumble::api::Characteristic>,
+}
+
+impl Peripheral_holder {
+    fn is_commet_blue(&self) -> bool {
+        let cmd_char = self
+            .characteristics
+            .iter()
+            .find(|c| c.uuid == characteristics::PASSWORD);
+        match cmd_char {
+            Some(_) => {
+                return true;
+            }
+            None => {
+                return false;
+            }
+        }
+    }
+
+    fn enter_pin(&self) {
+        let cmd_char = self
+            .characteristics
+            .iter()
+            .find(|c| c.uuid == characteristics::PASSWORD);
+        let authchar = match cmd_char {
+            Some(p) => {
+                println!("UUID:{}", characteristics::PASSWORD);
+                p
+            }
+            None => {
+                println!("Not found");
+                return;
+            }
+        };
+        let pwd = vec![0, 0, 0, 0];
+        self.peripheral.request(&authchar, &pwd).unwrap();
+    }
+    fn datetime(&self) {
+        println!("UUID:{}", characteristics::DATETIME);
+        let cmd_char = self
+            .characteristics
+            .iter()
+            .find(|c| c.uuid == characteristics::DATETIME);
+        let datetimechar = match cmd_char {
+            Some(p) => {
+                println!("UUID:{}", characteristics::DATETIME);
+                p
+            }
+            None => {
+                println!("Not found");
+                return;
+            }
+        };
+
+        let mut datetimevecraw = self.peripheral.read(&datetimechar).unwrap();
+        let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
+        let bing = comet_blue::Datetime::try_from(datetimevec).unwrap();
+        println!("Now {:?} will print!", bing);
+        for i in self.peripheral.read(&datetimechar).unwrap() {
+            println!("datetimechar:{}", i);
+        }
+        let setdate = getcommetdate().unwrap();
+        self.peripheral.request(&datetimechar, &setdate).unwrap();
+    }
+
+    fn read<T: TryFrom<Vec<u8>>>(&self, btuuid: rumble::api::UUID) -> Result<T, &'static str> {
+        let cmd_char = self.characteristics.iter().find(|c| c.uuid == btuuid);
+        let datetimechar = match cmd_char {
+            Some(p) => p,
+            None => {
+                return Err("btuuid not found");
+            }
+        };
+        let mut datetimevecraw = self.peripheral.read(&datetimechar).unwrap();
+        let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
+        match T::try_from(datetimevec) {
+            Ok(p) => Ok(p),
+            Err(_) => Err("sasdasd"),
+        }
+    }
+
+    fn commet_blue_read(&self) -> Result<comet_blue::CommetBlue, &'static str> {
+        let clock: comet_blue::Datetime = self.read(characteristics::DATETIME)?;
+        let battery: comet_blue::Battery = self.read(characteristics::BATTERY)?;
+        let temperatures: comet_blue::Temperatures = self.read(characteristics::TEMPERATURES)?;
+        let week = comet_blue::Week {
+            monday: self.read(characteristics::MONDAY)?,
+            tuesday: self.read(characteristics::TUESDAY)?,
+            wednesday: self.read(characteristics::WEDNESDAY)?,
+            thursday: self.read(characteristics::THURSDAY)?,
+            friday: self.read(characteristics::FRIDAY)?,
+            saterday: self.read(characteristics::SATERDAY)?,
+            sunday: self.read(characteristics::SUNDAY)?,
+        };
+        let holidays = comet_blue::Holidays {
+            holiday_1: self.read(characteristics::HOLIDAY_1)?,
+            holiday_2: self.read(characteristics::HOLIDAY_2)?,
+            holiday_3: self.read(characteristics::HOLIDAY_3)?,
+            holiday_4: self.read(characteristics::HOLIDAY_4)?,
+            holiday_5: self.read(characteristics::HOLIDAY_5)?,
+            holiday_6: self.read(characteristics::HOLIDAY_6)?,
+            holiday_7: self.read(characteristics::HOLIDAY_7)?,
+            holiday_8: self.read(characteristics::HOLIDAY_8)?,
+        };
+
+        let schedule = comet_blue::Schedule {
+            week: week,
+            holidays: holidays,
+        };
+        let pin = comet_blue::Pin {
+            pin_1: 0,
+            pin_2: 0,
+            pin_3: 0,
+            pin_4: 0,
+            pin_5: 0,
+            pin_6: 0,
+        };
+
+        let commetblue = comet_blue::CommetBlue {
+            address: self.peripheral.address().address,
+            pin: pin,
+            clock: clock,
+            identifier: "asdasd".to_string(),
+            version: "asdasd".to_string(),
+            firmware_revison: "asdasd".to_string(),
+            temperatures: temperatures,
+            schedule: schedule,
+            battery: battery,
+        };
+
+        Ok(commetblue)
+    }
+
+    fn write<T: TryInto<Vec<u8>>>(
+        &self,
+        t: T,
+        btuuid: rumble::api::UUID,
+    ) -> Result<(), &'static str> {
+        let cmd_char = self.characteristics.iter().find(|c| c.uuid == btuuid);
+        let datetimechar = match cmd_char {
+            Some(p) => p,
+            None => {
+                return Err("btuuid not found");
+            }
+        };
+        let writevec = match T::try_into(t) {
+            Ok(p) => p,
+            Err(_) => return Err("sasdasd"),
+        };
+        match self.peripheral.request(&datetimechar, &writevec) {
+            Ok(_) => Ok(()),
+            Err(p) => Err("failed"),
+        }
+    }
+
+    fn commet_blue_write(&mut self, cb: comet_blue::CommetBlue) -> Result<(), &'static str> {
+        self.write(cb.clock, characteristics::DATETIME)?;
+        self.write(cb.temperatures, characteristics::TEMPERATURES)?;
+        self.write(cb.schedule.week.monday, characteristics::MONDAY)?;
+        self.write(cb.schedule.week.tuesday, characteristics::TUESDAY)?;
+        self.write(cb.schedule.week.wednesday, characteristics::WEDNESDAY)?;
+        self.write(cb.schedule.week.thursday, characteristics::THURSDAY)?;
+        self.write(cb.schedule.week.friday, characteristics::FRIDAY)?;
+        self.write(cb.schedule.week.saterday, characteristics::SATERDAY)?;
+        self.write(cb.schedule.week.sunday, characteristics::SUNDAY)?;
+        self.write(cb.schedule.holidays.holiday_1, characteristics::HOLIDAY_1)?;
+        self.write(cb.schedule.holidays.holiday_2, characteristics::HOLIDAY_2)?;
+        self.write(cb.schedule.holidays.holiday_3, characteristics::HOLIDAY_3)?;
+        self.write(cb.schedule.holidays.holiday_4, characteristics::HOLIDAY_4)?;
+        self.write(cb.schedule.holidays.holiday_5, characteristics::HOLIDAY_5)?;
+        self.write(cb.schedule.holidays.holiday_6, characteristics::HOLIDAY_6)?;
+        self.write(cb.schedule.holidays.holiday_7, characteristics::HOLIDAY_7)?;
+        self.write(cb.schedule.holidays.holiday_8, characteristics::HOLIDAY_8)?;
+        Ok(())
+    }
+}
+
+fn discover() {
     let manager = Manager::new().unwrap();
 
     // get the first bluetooth adapter
@@ -81,55 +251,52 @@ pub fn main() {
     central.on_event(boo);
     // start scanning for devices
     central.start_scan().unwrap();
+
     // instead of waiting, you can use central.on_event to be notified of
     // new devices
     thread::sleep(Duration::from_secs(10));
     let foo = central.peripherals().into_iter();
-
+    //asdfg(&central);
     for num in foo {
         println!("address:{}", num.properties().address);
         match num.properties().local_name {
             Some(name) => println!("name:{}", name),
             None => {}
         }
+        //connect(&num);
+        //get_temps(&num);
     }
-    let light = central.peripherals().into_iter().nth(1).unwrap();
-    match light.properties().local_name {
-        Some(name) => println!("name:{}", name),
-        None => {}
-    }
-    // connect to the device
-    light.connect().unwrap();
-    // discover characteristics
-    light.discover_characteristics().unwrap();
+    for item in central.peripherals().into_iter() {
+        match item.connect() {
+            Ok(p) => {}
+            Err(p) => {
+                println!("Failed to connect:{}", p);
+                continue;
+            }
+        }
+        // discover characteristics
+        item.discover_characteristics().unwrap();
 
-    // find the characteristic we want
-    let chars = light.characteristics();
-    //    let authcharuuid : [u8; 16] = [ 0x47 , 0xE9, 0xEE, 0x30, 0x47, 0xE9, 0x11, 0xE4, 0x89, 0x39, 0x16, 0x42, 0x30, 0xD1, 0xDF, 0x67 ];
-    //    let authcharuuid : [u8; 16] = [ 0x67, 0xDF , 0xD1, 0x30, 0x42, 0x16, 0x39, 0x89, 0xE4, 0x11, 0xE9, 0x47, 0x30, 0xEE , 0xE9, 0x47];
-    //  let cmd_char = chars.iter().find(|c| c.uuid == UUID::B128(authcharuuid)).unwrap();
-    println!("len:{}", chars.len());
-    for char in chars.iter() {
-        println!("char:{}", char);
-    }
+        // find the characteristic we want
+        let chars = item.characteristics();
 
-    let temperatureschar = chars.iter().nth(28).unwrap();
-    println!("temperatureschar:{}", temperatureschar);
-    let datetimechar = chars.iter().nth(11).unwrap();
-    println!("datetimechar:{}", datetimechar);
-    let authchar = chars.iter().nth(32).unwrap();
-    println!("authchar:{}", authchar);
-    let pwd = vec![0, 0, 0, 0];
-    light.request(&authchar, &pwd).unwrap();
+        let mut jil = Peripheral_holder {
+            peripheral: item,
+            characteristics: chars,
+        };
+        if !jil.is_commet_blue() {
+            continue;
+        }
+        jil.enter_pin();
+        let boo = jil.commet_blue_read().unwrap();
+        let serialized = serde_json::to_string_pretty(&boo).unwrap();
 
-    light.discover_characteristics().unwrap();
-    let chars = light.characteristics();
-    for i in light.read(&temperatureschar).unwrap() {
-        println!("tmp:{}", i);
+        println!("{}", serialized);
+        let foo = boo.clone();
+        jil.commet_blue_write(foo);
     }
-    for i in light.read(&datetimechar).unwrap() {
-        println!("datetimechar:{}", i);
-    }
-    let setdate = getcommetdate().unwrap();
-    light.request(&datetimechar, &setdate).unwrap();
+}
+
+pub fn main() {
+    discover();
 }
