@@ -1,0 +1,7 @@
+[package]
+name = "comet-blue-automate"
+version = "0.1.0"
+authors = ["Owen Synge <owen.synge@jaysnest.de>"]
+edition = "2018"
+
+[dependencies]
