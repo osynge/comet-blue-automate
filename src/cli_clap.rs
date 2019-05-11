@@ -37,7 +37,7 @@ pub fn cli_clap<'a>() -> ArgMatches<'a> {
                 .long("save")
                 .value_name("JSON_OUTPUT")
                 .help("Save thermostat state to json file.")
-                .multiple(true)
+                .multiple(false)
                 .takes_value(true),
         );
     let matches = application.get_matches();
