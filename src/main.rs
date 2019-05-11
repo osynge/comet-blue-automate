@@ -18,7 +18,7 @@ use std::thread;
 use std::time::Duration;
 mod characteristics;
 mod comet_blue;
-use characteristics::PASSWORD;
+
 use comet_blue::{Datetime, Temperatures};
 use rumble::bluez::adapter::ConnectedAdapter;
 use std::convert::TryInto;
