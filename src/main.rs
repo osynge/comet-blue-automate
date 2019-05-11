@@ -17,6 +17,10 @@ use rumble::api::{Central, Peripheral, UUID};
 use rumble::bluez::manager::Manager;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 mod app_const;
@@ -237,7 +241,7 @@ impl PeripheralHolder {
     }
 }
 
-fn discover() {
+fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
     let manager = Manager::new().unwrap();
 
     // get the first bluetooth adapter
@@ -285,7 +289,7 @@ fn discover() {
         // find the characteristic we want
         let chars = item.characteristics();
 
-        let mut jil = PeripheralHolder {
+        let jil = PeripheralHolder {
             peripheral: item,
             characteristics: chars,
         };
@@ -295,7 +299,7 @@ fn discover() {
         jil.enter_pin();
         let boo = jil.commet_blue_read().unwrap();
 
-        let foo = boo.clone();
+        let _foo = boo.clone();
         all_peripherals.push(boo.clone());
         //jil.commet_blue_write(foo);
     }
@@ -304,8 +308,135 @@ fn discover() {
     println!("{}", serialized);
 }
 
+fn save(save_path: &str) {
+    let manager = Manager::new().unwrap();
+
+    // get the first bluetooth adapter
+    let adapters = manager.adapters().unwrap();
+    let mut adapter = adapters.into_iter().nth(0).unwrap();
+
+    // reset the adapter -- clears out any errant state
+
+    adapter = manager.down(&adapter).unwrap();
+    adapter = manager.up(&adapter).unwrap();
+
+    // connect to the adapter
+    let central = adapter.connect().unwrap();
+    let boo = Box::new(on_event);
+    central.on_event(boo);
+    // start scanning for devices
+    central.start_scan().unwrap();
+
+    // instead of waiting, you can use central.on_event to be notified of
+    // new devices
+    thread::sleep(Duration::from_secs(10));
+    let foo = central.peripherals().into_iter();
+    //asdfg(&central);
+    for num in foo {
+        debug!("address:{}", num.properties().address);
+        match num.properties().local_name {
+            Some(name) => info!("name:{}", name),
+            None => {}
+        }
+        //connect(&num);
+        //get_temps(&num);
+    }
+    let mut all_peripherals = Vec::new();
+    for item in central.peripherals().into_iter() {
+        match item.connect() {
+            Ok(_p) => {}
+            Err(p) => {
+                error!("Failed to connect:{}", p);
+                continue;
+            }
+        }
+        // discover characteristics
+        item.discover_characteristics().unwrap();
+
+        // find the characteristic we want
+        let chars = item.characteristics();
+
+        let jil = PeripheralHolder {
+            peripheral: item,
+            characteristics: chars,
+        };
+        if !jil.is_commet_blue() {
+            continue;
+        }
+        jil.enter_pin();
+        let boo = jil.commet_blue_read().unwrap();
+
+        let _foo = boo.clone();
+        all_peripherals.push(boo.clone());
+        //jil.commet_blue_write(foo);
+    }
+    let serialized = serde_json::to_string_pretty(&all_peripherals).unwrap();
+
+    println!("{}", serialized);
+    let path = Path::new(save_path);
+    let mut rsult_file = File::create(path);
+    let mut file = match rsult_file {
+        Ok(p) => p,
+        Err(p) => return,
+    };
+
+    file.write_all(serialized.as_bytes());
+}
+
+fn deserialise(load_paths: &Vec<String>) -> Result<Vec<comet_blue::CommetBlue>, &'static str> {
+    let mut output = Vec::new();
+    for path_string in load_paths {
+        let path = Path::new(path_string);
+        let display = path.display();
+        let mut file = match File::open(&path) {
+            // The `description` method of `io::Error` returns a string that
+            // describes the error
+            Err(why) => {
+                error!("couldn't open {}: {}", display, why.description());
+                continue;
+            }
+            Ok(file) => file,
+        };
+
+        // Read the file contents into a string, returns `io::Result<usize>`
+        let mut serialized = String::new();
+        match file.read_to_string(&mut serialized) {
+            Err(why) => {
+                error!("couldn't read {}: {}", display, why.description());
+                continue;
+            }
+            Ok(_) => debug!("{} contains:\n{}", display, serialized),
+        }
+        let mut deserialized: Vec<comet_blue::CommetBlue> =
+            serde_json::from_str(&serialized).unwrap();
+        output.append(&mut deserialized);
+    }
+    Ok(output)
+}
+
 pub fn main() {
     let clap_matches = cli_clap::cli_clap();
     fern_setup::log_setup(&clap_matches);
-    discover();
+
+    let mut load_path_list = Vec::new();
+
+    if let Some(load_it) = clap_matches.values_of("load") {
+        for load_str in load_it {
+            load_path_list.push(load_str.to_string());
+        }
+
+        let comet_blue_list = match deserialise(&load_path_list) {
+            Ok(p) => p,
+            Err(_) => {
+                return;
+            }
+        };
+
+        load(&comet_blue_list);
+    }
+
+    if let Some(mut load_it) = clap_matches.values_of("save") {
+        let save_path = load_it.nth(0).unwrap();
+        save(&save_path)
+    }
 }
