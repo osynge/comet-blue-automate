@@ -270,6 +270,7 @@ fn discover() {
         //connect(&num);
         //get_temps(&num);
     }
+    let mut all_peripherals = Vec::new();
     for item in central.peripherals().into_iter() {
         match item.connect() {
             Ok(_p) => {}
@@ -293,12 +294,14 @@ fn discover() {
         }
         jil.enter_pin();
         let boo = jil.commet_blue_read().unwrap();
-        let serialized = serde_json::to_string_pretty(&boo).unwrap();
 
-        println!("{}", serialized);
         let foo = boo.clone();
-        jil.commet_blue_write(foo);
+        all_peripherals.push(boo.clone());
+        //jil.commet_blue_write(foo);
     }
+    let serialized = serde_json::to_string_pretty(&all_peripherals).unwrap();
+
+    println!("{}", serialized);
 }
 
 pub fn main() {
