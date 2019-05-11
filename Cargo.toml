@@ -5,3 +5,10 @@ authors = ["Owen Synge <owen.synge@jaysnest.de>"]
 edition = "2018"
 
 [dependencies]
+# Using fork of rumble to work around https://github.com/mwylde/rumble/issues/34
+rumble = { git = "https://github.com/osynge/rumble.git", branch = "issues_34" }
+rand = "*"
+chrono = "*"
+serde_derive = "*"
+serde = "*"
+serde_json = "*"
