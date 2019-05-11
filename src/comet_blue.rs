@@ -46,7 +46,7 @@ impl TryFrom<Vec<u8>> for Datetime {
     type Error = &'static str;
     fn try_from(input: Vec<u8>) -> Result<Self, Self::Error> {
         if input.len() != 5 {
-            return Err("wrong lenght");
+            return Err("wrong length");
         }
         Ok(Datetime {
             minute: input[0],
