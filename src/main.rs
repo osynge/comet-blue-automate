@@ -53,12 +53,12 @@ fn getcommetdate() -> Result<Vec<u8>, ()> {
     };
 }
 
-pub struct Peripheral_holder {
+pub struct PeripheralHolder {
     peripheral: rumble::bluez::adapter::peripheral::Peripheral,
     characteristics: BTreeSet<rumble::api::Characteristic>,
 }
 
-impl Peripheral_holder {
+impl PeripheralHolder {
     fn is_commet_blue(&self) -> bool {
         let cmd_char = self
             .characteristics
@@ -280,7 +280,7 @@ fn discover() {
         // find the characteristic we want
         let chars = item.characteristics();
 
-        let mut jil = Peripheral_holder {
+        let mut jil = PeripheralHolder {
             peripheral: item,
             characteristics: chars,
         };
