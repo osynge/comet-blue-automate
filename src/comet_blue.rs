@@ -299,7 +299,7 @@ pub struct Week {
     pub wednesday: Day,
     pub thursday: Day,
     pub friday: Day,
-    pub saterday: Day,
+    pub saturday: Day,
     pub sunday: Day,
 }
 
