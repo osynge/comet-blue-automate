@@ -159,7 +159,7 @@ impl PeripheralHolder {
             wednesday: self.read(characteristics::WEDNESDAY)?,
             thursday: self.read(characteristics::THURSDAY)?,
             friday: self.read(characteristics::FRIDAY)?,
-            saterday: self.read(characteristics::SATERDAY)?,
+            saturday: self.read(characteristics::SATURDAY)?,
             sunday: self.read(characteristics::SUNDAY)?,
         };
         let holidays = comet_blue::Holidays {
@@ -232,7 +232,7 @@ impl PeripheralHolder {
         self.write(cb.schedule.week.wednesday, characteristics::WEDNESDAY)?;
         self.write(cb.schedule.week.thursday, characteristics::THURSDAY)?;
         self.write(cb.schedule.week.friday, characteristics::FRIDAY)?;
-        self.write(cb.schedule.week.saterday, characteristics::SATERDAY)?;
+        self.write(cb.schedule.week.saturday, characteristics::SATURDAY)?;
         self.write(cb.schedule.week.sunday, characteristics::SUNDAY)?;
         self.write(cb.schedule.holidays.holiday_1, characteristics::HOLIDAY_1)?;
         self.write(cb.schedule.holidays.holiday_2, characteristics::HOLIDAY_2)?;
