@@ -1,6 +1,55 @@
 # comet-blue-automate
 
-This Linux application automates one or more "Comet Blue" compatible radiator thermostat, by converting the state to and from JSON. It uses Bluetooth Low Energy (BLE) to control the radiator thermostat Comet Blue.
+This Linux application automates one or more "Comet Blue" compatible radiator thermostat, by converting the state to and from JSON. It uses Bluetooth Low Energy (BLE) to control the radiator thermostat Comet Blue from the manufacturer EUROtronic GmbH. It depends on [rumble](https://github.com/mwylde/rumble) and [BlueZ](http://www.bluez.org/) and runs on Linux.
+
+# Compiling
+
+comet-blue-automate is written in [rust](https://www.rust-lang.org/) and uses [cargo](https://doc.rust-lang.org/cargo/guide/) to build.
+
+    $ cargo build --release
+
+`cargo build --release` puts the resulting binary in `target/release` instead of `target/debug`.
+
+You can run the application in the target directory, or copy it to a system path.
+
+    $ ./target/debug/comet-blue-automate -h
+
+# Quickstart
+
+You probably do not have permission as a normal linux UID to run comet-blue-automate and will get a `PermissionDenied` error, as it interfaces with BlueZ to control the Bluetooth interface so it maybe easiest to test running with higher privileges. In this quickstart we run as root, but running this application in the `bluetooth` group would be production practice with cron.
+
+First record the state of all your comet-blue thermostats in each room. For example:
+
+    # comet-blue-automate --save kitchen.json
+    # comet-blue-automate --save bedroom.json
+    # comet-blue-automate --save livingroom.json
+    # comet-blue-automate --save bathroom.json
+
+These json files are lists of thermostat states. These can be written back to the thermostats listed to restore the state.
+
+These files may have duplicates thermostats, so it is easier to make 1 new file for each thermostat:
+
+    # ls
+    kitchen-thermostat.json
+    bedroom-thermostat.json
+    livingroom-thermostat.json
+    bathroom-thermostat.json
+
+Alternatively you can put all thermostat state in a single json file.
+
+Next delete the `clock` from each thermostat's json file. This will then allow `comet-blue-automate` to set the thermostat's clock to local system time.
+
+    "clock": {
+          "minute": 54,
+          "hour": 20,
+          "day": 11,
+          "month": 5,
+          "year": 19
+    },
+
+The command `comet-blue-automate --load json` will attempt to apply the json file to thermostats which match the Bluetooth address. It will not error if the device is not found. This allows us apply all state with a single run of the application.
+
+    # comet-blue-automate --load kitchen-thermostat.json --load bedroom-thermostat.json --load livingroom-thermostat.json --load bathroom-thermostat.json
 
 # Usage of comet-blue-automate
 
