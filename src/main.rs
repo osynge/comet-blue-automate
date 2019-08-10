@@ -62,188 +62,298 @@ fn getcommetdate() -> Result<Vec<u8>, ()> {
         Err(_) => return Err(()),
     };
 }
-
+/*
 pub struct PeripheralHolder {
-    peripheral: rumble::bluez::adapter::peripheral::Peripheral,
+    peripheral: rumble::api::Peripheral,
     characteristics: BTreeSet<rumble::api::Characteristic>,
 }
+*/
 
-impl PeripheralHolder {
-    fn is_commet_blue(&self) -> bool {
-        let cmd_char = self
-            .characteristics
-            .iter()
-            .find(|c| c.uuid == characteristics::PASSWORD);
-        match cmd_char {
-            Some(_) => {
-                return true;
-            }
-            None => {
-                return false;
-            }
+fn is_commet_blue<P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+) -> bool {
+    let cmd_char = characteristics
+        .iter()
+        .find(|c| c.uuid == characteristics::PASSWORD);
+    match cmd_char {
+        Some(_) => {
+            return true;
+        }
+        None => {
+            return false;
         }
     }
+}
 
-    fn enter_pin(&self) {
-        let cmd_char = self
-            .characteristics
-            .iter()
-            .find(|c| c.uuid == characteristics::PASSWORD);
-        let authchar = match cmd_char {
-            Some(p) => {
-                debug!("UUID:{}", characteristics::PASSWORD);
-                p
-            }
-            None => {
-                error!("Not found");
-                return;
-            }
-        };
-        let pwd = vec![0, 0, 0, 0];
-        self.peripheral.request(&authchar, &pwd).unwrap();
-    }
-    fn datetime(&self) {
-        let cmd_char = self
-            .characteristics
-            .iter()
-            .find(|c| c.uuid == characteristics::DATETIME);
-        let datetimechar = match cmd_char {
-            Some(p) => {
-                debug!("UUID:{}", characteristics::DATETIME);
-                p
-            }
-            None => {
-                error!("characteristics not found");
-                return;
-            }
-        };
-
-        let mut datetimevecraw = self.peripheral.read(&datetimechar).unwrap();
-        let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
-        let bing = comet_blue::Datetime::try_from(datetimevec).unwrap();
-        println!("Now {:?} will print!", bing);
-        for i in self.peripheral.read(&datetimechar).unwrap() {
-            println!("datetimechar:{}", i);
+fn enter_pin<P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+) {
+    let cmd_char = characteristics
+        .iter()
+        .find(|c| c.uuid == characteristics::PASSWORD);
+    let authchar = match cmd_char {
+        Some(p) => {
+            debug!("UUID:{}", characteristics::PASSWORD);
+            p
         }
-        let setdate = getcommetdate().unwrap();
-        self.peripheral.request(&datetimechar, &setdate).unwrap();
-    }
-
-    fn read<T: TryFrom<Vec<u8>>>(&self, btuuid: rumble::api::UUID) -> Result<T, &'static str> {
-        let cmd_char = self.characteristics.iter().find(|c| c.uuid == btuuid);
-        let datetimechar = match cmd_char {
-            Some(p) => p,
-            None => {
-                return Err("btuuid not found");
-            }
-        };
-        let mut datetimevecraw = self.peripheral.read(&datetimechar).unwrap();
-        let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
-        match T::try_from(datetimevec) {
-            Ok(p) => Ok(p),
-            Err(_) => Err("sasdasd"),
+        None => {
+            error!("Not found");
+            return;
         }
-    }
+    };
+    let pwd = vec![0, 0, 0, 0];
+    peripheral.request(&authchar, &pwd).unwrap();
+}
 
-    fn commet_blue_read(&self) -> Result<comet_blue::CommetBlue, &'static str> {
-        let clock: comet_blue::Datetime = self.read(characteristics::DATETIME)?;
-        let battery: comet_blue::Battery = self.read(characteristics::BATTERY)?;
-        let temperatures: comet_blue::Temperatures = self.read(characteristics::TEMPERATURES)?;
-        let identifier: comet_blue::Text = self.read(characteristics::IDENTIFIER)?;
-        let version: comet_blue::Text = self.read(characteristics::VERSION)?;
-        let firmware_revison: comet_blue::Text = self.read(characteristics::FIRMWARE_VERSION)?;
-        let manufacturer: comet_blue::Text = self.read(characteristics::MANUFACTURER)?;
-        let week = comet_blue::Week {
-            monday: self.read(characteristics::MONDAY)?,
-            tuesday: self.read(characteristics::TUESDAY)?,
-            wednesday: self.read(characteristics::WEDNESDAY)?,
-            thursday: self.read(characteristics::THURSDAY)?,
-            friday: self.read(characteristics::FRIDAY)?,
-            saturday: self.read(characteristics::SATURDAY)?,
-            sunday: self.read(characteristics::SUNDAY)?,
-        };
-        let holidays = comet_blue::Holidays {
-            holiday_1: self.read(characteristics::HOLIDAY_1)?,
-            holiday_2: self.read(characteristics::HOLIDAY_2)?,
-            holiday_3: self.read(characteristics::HOLIDAY_3)?,
-            holiday_4: self.read(characteristics::HOLIDAY_4)?,
-            holiday_5: self.read(characteristics::HOLIDAY_5)?,
-            holiday_6: self.read(characteristics::HOLIDAY_6)?,
-            holiday_7: self.read(characteristics::HOLIDAY_7)?,
-            holiday_8: self.read(characteristics::HOLIDAY_8)?,
-        };
-
-        let schedule = comet_blue::Schedule {
-            week: week,
-            holidays: holidays,
-        };
-        let pin = comet_blue::Pin {
-            pin_1: 0,
-            pin_2: 0,
-            pin_3: 0,
-            pin_4: 0,
-            pin_5: 0,
-            pin_6: 0,
-        };
-
-        let commetblue = comet_blue::CommetBlue {
-            address: self.peripheral.address().address,
-            pin: pin,
-            clock: clock,
-            identifier: identifier,
-            version: version,
-            firmware_revison: firmware_revison,
-            manufacturer: manufacturer,
-            temperatures: temperatures,
-            schedule: schedule,
-            battery: battery,
-        };
-
-        Ok(commetblue)
-    }
-
-    fn write<T: TryInto<Vec<u8>>>(
-        &self,
-        t: T,
-        btuuid: rumble::api::UUID,
-    ) -> Result<(), &'static str> {
-        let cmd_char = self.characteristics.iter().find(|c| c.uuid == btuuid);
-        let datetimechar = match cmd_char {
-            Some(p) => p,
-            None => {
-                return Err("btuuid not found");
-            }
-        };
-        let writevec = match T::try_into(t) {
-            Ok(p) => p,
-            Err(_) => return Err("sasdasd"),
-        };
-        match self.peripheral.request(&datetimechar, &writevec) {
-            Ok(_) => Ok(()),
-            Err(_p) => Err("failed"),
+fn datetime<P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+) {
+    let cmd_char = characteristics
+        .iter()
+        .find(|c| c.uuid == characteristics::DATETIME);
+    let datetimechar = match cmd_char {
+        Some(p) => {
+            debug!("UUID:{}", characteristics::DATETIME);
+            p
         }
-    }
+        None => {
+            error!("characteristics not found");
+            return;
+        }
+    };
 
-    fn commet_blue_write(&mut self, cb: comet_blue::CommetBlue) -> Result<(), &'static str> {
-        self.write(cb.clock, characteristics::DATETIME)?;
-        self.write(cb.temperatures, characteristics::TEMPERATURES)?;
-        self.write(cb.schedule.week.monday, characteristics::MONDAY)?;
-        self.write(cb.schedule.week.tuesday, characteristics::TUESDAY)?;
-        self.write(cb.schedule.week.wednesday, characteristics::WEDNESDAY)?;
-        self.write(cb.schedule.week.thursday, characteristics::THURSDAY)?;
-        self.write(cb.schedule.week.friday, characteristics::FRIDAY)?;
-        self.write(cb.schedule.week.saturday, characteristics::SATURDAY)?;
-        self.write(cb.schedule.week.sunday, characteristics::SUNDAY)?;
-        self.write(cb.schedule.holidays.holiday_1, characteristics::HOLIDAY_1)?;
-        self.write(cb.schedule.holidays.holiday_2, characteristics::HOLIDAY_2)?;
-        self.write(cb.schedule.holidays.holiday_3, characteristics::HOLIDAY_3)?;
-        self.write(cb.schedule.holidays.holiday_4, characteristics::HOLIDAY_4)?;
-        self.write(cb.schedule.holidays.holiday_5, characteristics::HOLIDAY_5)?;
-        self.write(cb.schedule.holidays.holiday_6, characteristics::HOLIDAY_6)?;
-        self.write(cb.schedule.holidays.holiday_7, characteristics::HOLIDAY_7)?;
-        self.write(cb.schedule.holidays.holiday_8, characteristics::HOLIDAY_8)?;
-        Ok(())
+    let mut datetimevecraw = peripheral.read(&datetimechar).unwrap();
+    let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
+    let bing = comet_blue::Datetime::try_from(datetimevec).unwrap();
+    println!("Now {:?} will print!", bing);
+    for i in peripheral.read(&datetimechar).unwrap() {
+        println!("datetimechar:{}", i);
     }
+    let setdate = getcommetdate().unwrap();
+    peripheral.request(&datetimechar, &setdate).unwrap();
+}
+
+fn read<T: TryFrom<Vec<u8>>, P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+    btuuid: rumble::api::UUID,
+) -> Result<T, &'static str> {
+    let cmd_char = characteristics.iter().find(|c| c.uuid == btuuid);
+    let datetimechar = match cmd_char {
+        Some(p) => p,
+        None => {
+            return Err("btuuid not found");
+        }
+    };
+    let mut datetimevecraw = peripheral.read(&datetimechar).unwrap();
+    let datetimevec: Vec<_> = datetimevecraw.drain(1..).collect();
+    match T::try_from(datetimevec) {
+        Ok(p) => Ok(p),
+        Err(_) => Err("sasdasd"),
+    }
+}
+
+fn write<T: TryInto<Vec<u8>>, P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+    t: T,
+    btuuid: rumble::api::UUID,
+) -> Result<(), &'static str> {
+    let cmd_char = characteristics.iter().find(|c| c.uuid == btuuid);
+    let datetimechar = match cmd_char {
+        Some(p) => p,
+        None => {
+            return Err("btuuid not found");
+        }
+    };
+    let writevec = match T::try_into(t) {
+        Ok(p) => p,
+        Err(_) => return Err("sasdasd"),
+    };
+    match peripheral.request(&datetimechar, &writevec) {
+        Ok(_) => Ok(()),
+        Err(_p) => Err("failed"),
+    }
+}
+
+fn commet_blue_read<P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+) -> Result<comet_blue::CommetBlue, &'static str> {
+    let clock: comet_blue::Datetime = read(peripheral, characteristics, characteristics::DATETIME)?;
+    let battery: comet_blue::Battery = read(peripheral, characteristics, characteristics::BATTERY)?;
+    let temperatures: comet_blue::Temperatures =
+        read(peripheral, characteristics, characteristics::TEMPERATURES)?;
+    let identifier: comet_blue::Text =
+        read(peripheral, characteristics, characteristics::IDENTIFIER)?;
+    let version: comet_blue::Text = read(peripheral, characteristics, characteristics::VERSION)?;
+    let firmware_revison: comet_blue::Text = read(
+        peripheral,
+        characteristics,
+        characteristics::FIRMWARE_VERSION,
+    )?;
+    let manufacturer: comet_blue::Text =
+        read(peripheral, characteristics, characteristics::MANUFACTURER)?;
+    let week = comet_blue::Week {
+        monday: read(peripheral, characteristics, characteristics::MONDAY)?,
+        tuesday: read(peripheral, characteristics, characteristics::TUESDAY)?,
+        wednesday: read(peripheral, characteristics, characteristics::WEDNESDAY)?,
+        thursday: read(peripheral, characteristics, characteristics::THURSDAY)?,
+        friday: read(peripheral, characteristics, characteristics::FRIDAY)?,
+        saturday: read(peripheral, characteristics, characteristics::SATURDAY)?,
+        sunday: read(peripheral, characteristics, characteristics::SUNDAY)?,
+    };
+    let holidays = comet_blue::Holidays {
+        holiday_1: read(peripheral, characteristics, characteristics::HOLIDAY_1)?,
+        holiday_2: read(peripheral, characteristics, characteristics::HOLIDAY_2)?,
+        holiday_3: read(peripheral, characteristics, characteristics::HOLIDAY_3)?,
+        holiday_4: read(peripheral, characteristics, characteristics::HOLIDAY_4)?,
+        holiday_5: read(peripheral, characteristics, characteristics::HOLIDAY_5)?,
+        holiday_6: read(peripheral, characteristics, characteristics::HOLIDAY_6)?,
+        holiday_7: read(peripheral, characteristics, characteristics::HOLIDAY_7)?,
+        holiday_8: read(peripheral, characteristics, characteristics::HOLIDAY_8)?,
+    };
+
+    let schedule = comet_blue::Schedule {
+        week: week,
+        holidays: holidays,
+    };
+    let pin = comet_blue::Pin {
+        pin_1: 0,
+        pin_2: 0,
+        pin_3: 0,
+        pin_4: 0,
+        pin_5: 0,
+        pin_6: 0,
+    };
+
+    let commetblue = comet_blue::CommetBlue {
+        address: peripheral.address().address,
+        pin: pin,
+        clock: clock,
+        identifier: identifier,
+        version: version,
+        firmware_revison: firmware_revison,
+        manufacturer: manufacturer,
+        temperatures: temperatures,
+        schedule: schedule,
+        battery: battery,
+    };
+
+    Ok(commetblue)
+}
+
+fn commet_blue_write<P: rumble::api::Peripheral>(
+    peripheral: &P,
+    characteristics: &BTreeSet<rumble::api::Characteristic>,
+    cb: comet_blue::CommetBlue,
+) -> Result<(), &'static str> {
+    write(
+        peripheral,
+        characteristics,
+        cb.clock,
+        characteristics::DATETIME,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.temperatures,
+        characteristics::TEMPERATURES,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.monday,
+        characteristics::MONDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.tuesday,
+        characteristics::TUESDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.wednesday,
+        characteristics::WEDNESDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.thursday,
+        characteristics::THURSDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.friday,
+        characteristics::FRIDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.saturday,
+        characteristics::SATURDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.week.sunday,
+        characteristics::SUNDAY,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_1,
+        characteristics::HOLIDAY_1,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_2,
+        characteristics::HOLIDAY_2,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_3,
+        characteristics::HOLIDAY_3,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_4,
+        characteristics::HOLIDAY_4,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_5,
+        characteristics::HOLIDAY_5,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_6,
+        characteristics::HOLIDAY_6,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_7,
+        characteristics::HOLIDAY_7,
+    )?;
+    write(
+        peripheral,
+        characteristics,
+        cb.schedule.holidays.holiday_8,
+        characteristics::HOLIDAY_8,
+    )?;
+    Ok(())
 }
 
 fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
@@ -280,8 +390,8 @@ fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
         //get_temps(&num);
     }
 
-    for item in central.peripherals().into_iter() {
-        match item.connect() {
+    for peripheral in central.peripherals().into_iter() {
+        match peripheral.connect() {
             Ok(_p) => {}
             Err(p) => {
                 error!("Failed to connect:{}", p);
@@ -289,24 +399,20 @@ fn load(cb_list: &Vec<comet_blue::CommetBlue>) {
             }
         }
         // discover characteristics
-        item.discover_characteristics().unwrap();
+        peripheral.discover_characteristics().unwrap();
 
         // find the characteristic we want
-        let chars = item.characteristics();
+        let characteristics = peripheral.characteristics();
 
-        let mut jil = PeripheralHolder {
-            peripheral: item,
-            characteristics: chars,
-        };
-        if !jil.is_commet_blue() {
+        if !is_commet_blue(&peripheral, &characteristics) {
             continue;
         }
-        jil.enter_pin();
-        let boo = jil.commet_blue_read().unwrap();
+        enter_pin(&peripheral, &characteristics);
+        let boo = commet_blue_read(&peripheral, &characteristics).unwrap();
 
         for load_perf in cb_list {
             if load_perf.address == boo.address {
-                jil.commet_blue_write(load_perf.clone());
+                commet_blue_write(&peripheral, &characteristics, load_perf.clone());
             }
         }
 
@@ -348,8 +454,8 @@ fn save(save_path: &str) {
         //get_temps(&num);
     }
     let mut all_peripherals = Vec::new();
-    for item in central.peripherals().into_iter() {
-        match item.connect() {
+    for peripheral in central.peripherals().into_iter() {
+        match peripheral.connect() {
             Ok(_p) => {}
             Err(p) => {
                 error!("Failed to connect:{}", p);
@@ -357,19 +463,15 @@ fn save(save_path: &str) {
             }
         }
         // discover characteristics
-        item.discover_characteristics().unwrap();
+        peripheral.discover_characteristics().unwrap();
         // find the characteristic we want
-        let chars = item.characteristics();
+        let characteristics = peripheral.characteristics();
 
-        let jil = PeripheralHolder {
-            peripheral: item,
-            characteristics: chars,
-        };
-        if !jil.is_commet_blue() {
+        if !is_commet_blue(&peripheral, &characteristics) {
             continue;
         }
-        jil.enter_pin();
-        let boo = jil.commet_blue_read().unwrap();
+        enter_pin(&peripheral, &characteristics);
+        let boo = commet_blue_read(&peripheral, &characteristics).unwrap();
 
         let _foo = boo.clone();
         all_peripherals.push(boo.clone());
